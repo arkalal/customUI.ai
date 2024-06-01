@@ -1,0 +1,14 @@
+.appContainer {
+  display: flex;
+
+  .codeContainer {
+    width: 100%;
+    padding: 20px;
+    background-color: #282c34;
+    color: white;
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+}
