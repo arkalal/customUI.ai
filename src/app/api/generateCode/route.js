@@ -22,107 +22,61 @@ export async function POST(req) {
 }
 
 function generateJSX(design) {
-  const componentsCode = design.components
-    .map((component) => {
-      if (component.type === "group") {
-        const groupComponents = component.shapes
-          .map((shape) => {
-            const componentName =
-              shape.id.charAt(0).toUpperCase() + shape.id.slice(1);
-            const stylesName =
-              shape.id.charAt(0).toLowerCase() + shape.id.slice(1);
-
-            return `
-const ${componentName} = () => (
-  <div className={styles.${stylesName}} style={{
-    width: '${shape.width || 0}px',
-    height: '${shape.height || 0}px',
-    backgroundColor: '${shape.fill || "transparent"}'
-  }}>
-    ${shape.content || ""}
-  </div>
-);
-export default ${componentName};
-            `;
-          })
-          .join("\n");
-
-        return `
-const ${component.id} = () => (
-  <div>
-    ${groupComponents}
-  </div>
-);
-export default ${component.id};
-        `;
-      } else {
-        const componentName =
-          component.id.charAt(0).toUpperCase() + component.id.slice(1);
-        const stylesName =
-          component.id.charAt(0).toLowerCase() + component.id.slice(1);
-
-        return `
-const ${componentName} = () => (
-  <div className={styles.${stylesName}} style={{
-    width: '${component.width || 0}px',
-    height: '${component.height || 0}px',
-    backgroundColor: '${component.fill || "transparent"}'
-  }}>
-    ${component.content || ""}
-  </div>
-);
-export default ${componentName};
-        `;
-      }
-    })
-    .join("\n");
-
   return `
 import React from 'react';
 import styles from './${design.name}.module.scss';
 
-${componentsCode}
-`;
-}
-
-function generateSCSS(design) {
-  const stylesCode = design.components
-    .map((component) => {
-      if (component.type === "group") {
-        const groupStyles = component.shapes
-          .map((shape) => {
-            const stylesName =
-              shape.id.charAt(0).toLowerCase() + shape.id.slice(1);
-
-            return `
-.${stylesName} {
-  width: ${shape.width || 0}px;
-  height: ${shape.height || 0}px;
-  background-color: ${shape.fill || "transparent"};
-}
-            `;
-          })
-          .join("\n");
-
-        return `
-.${component.id} {
-  ${groupStyles}
-}
-        `;
-      } else {
+const ${design.name} = () => (
+  <div className={styles.container}>
+    ${design.components
+      .map((component) => {
         const stylesName =
           component.id.charAt(0).toLowerCase() + component.id.slice(1);
 
         return `
+        <div className={styles.${stylesName}} style={{
+          position: 'absolute',
+          left: '${component.x}px',
+          top: '${component.y}px',
+          width: '${component.width || 0}px',
+          height: '${component.height || 0}px',
+          backgroundColor: '${component.fill || "transparent"}'
+        }}>
+          ${component.text || ""}
+        </div>`;
+      })
+      .join("\n")}
+  </div>
+);
+
+export default ${design.name};
+  `;
+}
+
+function generateSCSS(design) {
+  return `
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+${design.components
+  .map((component) => {
+    const stylesName =
+      component.id.charAt(0).toLowerCase() + component.id.slice(1);
+
+    return `
 .${stylesName} {
+  position: absolute;
+  left: ${component.x}px;
+  top: ${component.y}px;
   width: ${component.width || 0}px;
   height: ${component.height || 0}px;
   background-color: ${component.fill || "transparent"};
 }
-        `;
-      }
-    })
-    .join("\n");
-
-  return stylesCode;
+    `;
+  })
+  .join("\n")}
+  `;
 }

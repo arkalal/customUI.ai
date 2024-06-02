@@ -7,7 +7,19 @@ export async function POST(req) {
 
   try {
     await connectMongoDB();
-    const newDesign = new Design({ name, components, styles });
+
+    // Ensure every component has width and height
+    const validatedComponents = components.map((component) => {
+      if (!component.width) component.width = 100; // Default width
+      if (!component.height) component.height = 100; // Default height
+      return component;
+    });
+
+    const newDesign = new Design({
+      name,
+      components: validatedComponents,
+      styles,
+    });
     await newDesign.save();
 
     return NextResponse.json(

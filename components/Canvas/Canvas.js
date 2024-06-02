@@ -10,17 +10,41 @@ const Canvas = ({
   setTool,
   selectedShape,
   setSelectedShape,
-  groupShapes,
-  setGroupShapes,
 }) => {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState(null);
-  const [selectionRect, setSelectionRect] = useState(null);
   const [canvasDimensions, setCanvasDimensions] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: 0,
+    height: 0,
   });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandleIndex, setResizeHandleIndex] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCanvasDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+
+      const handleResize = () => {
+        setCanvasDimensions({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        });
+      };
+
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, []);
+
+  const drawSelectionOutline = (context, shape) => {
+    // Function implementation...
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -36,10 +60,16 @@ const Canvas = ({
           context.rect(shape.x, shape.y, shape.width, shape.height);
           context.fillStyle = shape.fill;
           context.fill();
+          if (shape.selected) {
+            drawSelectionOutline(context, shape);
+          }
         } else if (shape.type === "circle") {
           context.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
           context.fillStyle = shape.fill;
           context.fill();
+          if (shape.selected) {
+            drawSelectionOutline(context, shape);
+          }
         } else if (shape.type === "line") {
           context.moveTo(shape.points[0], shape.points[1]);
           context.lineTo(shape.points[2], shape.points[3]);
@@ -50,26 +80,16 @@ const Canvas = ({
           context.font = `${shape.fontSize}px Arial`;
           context.fillStyle = shape.fill;
           context.fillText(shape.text, shape.x, shape.y);
+          if (shape.selected) {
+            drawSelectionOutline(context, shape);
+          }
         }
         context.closePath();
       });
-
-      if (selectionRect) {
-        context.beginPath();
-        context.rect(
-          selectionRect.x,
-          selectionRect.y,
-          selectionRect.width,
-          selectionRect.height
-        );
-        context.fillStyle = "rgba(0, 0, 255, 0.3)";
-        context.fill();
-        context.closePath();
-      }
     };
 
     drawShapes();
-  }, [shapes, selectionRect, canvasDimensions]);
+  }, [shapes, canvasDimensions]);
 
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
@@ -92,11 +112,58 @@ const Canvas = ({
         ...(tool === "text"
           ? { text: "Sample Text", fontSize: 24, fill: "black" }
           : {}),
+        selected: true,
       };
       setCurrentShape(newShape);
-      setShapes([...shapes, newShape]);
+      setShapes([
+        ...shapes.map((shape) => ({ ...shape, selected: false })),
+        newShape,
+      ]);
+      setSelectedShape(newShape);
     } else {
-      setSelectionRect({ x: x, y: y, width: 0, height: 0 });
+      let handleClicked = false;
+      if (selectedShape) {
+        const handles = drawSelectionOutline(
+          canvas.getContext("2d"),
+          selectedShape
+        );
+        handles.forEach((handle, index) => {
+          if (
+            x >= handle.x &&
+            x <= handle.x + 8 &&
+            y >= handle.y &&
+            y <= handle.y + 8
+          ) {
+            setIsResizing(true);
+            setResizeHandleIndex(index);
+            handleClicked = true;
+          }
+        });
+      }
+      if (!handleClicked) {
+        const clickedShape = shapes.find(
+          (shape) =>
+            x >= shape.x &&
+            x <= shape.x + (shape.width || shape.radius * 2) &&
+            y >= shape.y &&
+            y <= shape.y + (shape.height || shape.radius * 2)
+        );
+        if (clickedShape) {
+          setSelectedShape(clickedShape);
+          setShapes(
+            shapes.map((shape) =>
+              shape.id === clickedShape.id
+                ? { ...shape, selected: true }
+                : { ...shape, selected: false }
+            )
+          );
+          setIsDragging(true);
+          setDragStart({ x, y });
+        } else {
+          setSelectedShape(null);
+          setShapes(shapes.map((shape) => ({ ...shape, selected: false })));
+        }
+      }
     }
   };
 
@@ -125,33 +192,67 @@ const Canvas = ({
       }
       setCurrentShape(updatedShape);
       setShapes([...shapes.slice(0, -1), updatedShape]);
-    } else if (selectionRect) {
-      setSelectionRect({
-        ...selectionRect,
-        width: x - selectionRect.x,
-        height: y - selectionRect.y,
-      });
+    } else if (isDragging && selectedShape) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      setShapes(
+        shapes.map((shape) =>
+          shape.id === selectedShape.id
+            ? {
+                ...shape,
+                x: shape.x + dx,
+                y: shape.y + dy,
+              }
+            : shape
+        )
+      );
+      setDragStart({ x, y });
+    } else if (isResizing && selectedShape) {
+      const updatedShape = { ...selectedShape };
+      if (updatedShape.type === "rectangle") {
+        switch (resizeHandleIndex) {
+          case 0:
+            updatedShape.width += updatedShape.x - x;
+            updatedShape.height += updatedShape.y - y;
+            updatedShape.x = x;
+            updatedShape.y = y;
+            break;
+          case 1:
+            updatedShape.width = x - updatedShape.x;
+            updatedShape.height += updatedShape.y - y;
+            updatedShape.y = y;
+            break;
+          case 2:
+            updatedShape.width += updatedShape.x - x;
+            updatedShape.x = x;
+            updatedShape.height = y - updatedShape.y;
+            break;
+          case 3:
+            updatedShape.width = x - updatedShape.x;
+            updatedShape.height = y - updatedShape.y;
+            break;
+          default:
+            break;
+        }
+      } else if (updatedShape.type === "circle") {
+        const newRadius = Math.sqrt(
+          Math.pow(x - updatedShape.x, 2) + Math.pow(y - updatedShape.y, 2)
+        );
+        updatedShape.radius = newRadius;
+      }
+      setShapes(
+        shapes.map((shape) =>
+          shape.id === selectedShape.id ? updatedShape : shape
+        )
+      );
     }
   };
 
   const handleMouseUp = () => {
     setDrawing(false);
     setTool(null);
-    if (selectionRect) {
-      const updatedShapes = shapes.map((shape) => {
-        if (
-          shape.x > selectionRect.x &&
-          shape.y > selectionRect.y &&
-          shape.x < selectionRect.x + selectionRect.width &&
-          shape.y < selectionRect.y + selectionRect.height
-        ) {
-          return { ...shape, selected: true };
-        }
-        return shape;
-      });
-      setShapes(updatedShapes);
-      setSelectionRect(null);
-    }
+    setIsDragging(false);
+    setIsResizing(false);
   };
 
   const handleKeyDown = (e) => {
@@ -167,17 +268,6 @@ const Canvas = ({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [selectedShape]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setCanvasDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   return (
     <div className={styles.canvasContainer}>

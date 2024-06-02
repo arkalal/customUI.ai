@@ -5,8 +5,8 @@ const componentSchema = new Schema({
   type: { type: String, required: true },
   x: { type: Number, required: true },
   y: { type: Number, required: true },
-  width: { type: Number, required: true },
-  height: { type: Number, required: true },
+  width: { type: Number, required: true, default: 100 }, // Default width
+  height: { type: Number, required: true, default: 100 }, // Default height
   fill: { type: String, required: true },
   radius: { type: Number }, // only for circles
   points: { type: [Number] }, // only for lines
