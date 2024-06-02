@@ -10,6 +10,7 @@ import Modal from "../Modal/Modal";
 
 const Home = () => {
   const [shapes, setShapes] = useState([]);
+  const [groupShapes, setGroupShapes] = useState([]);
   const [generatedCode, setGeneratedCode] = useState({
     jsxCode: "",
     scssCode: "",
@@ -25,8 +26,8 @@ const Home = () => {
 
   const saveDesign = async () => {
     const response = await axios.post("saveDesign", {
-      name: "My Design",
-      components: shapes,
+      name: "MyDesign",
+      components: [...shapes, ...groupShapes],
       styles: {},
     });
 
@@ -39,9 +40,7 @@ const Home = () => {
   };
 
   const generateCode = async () => {
-    const response = await axios.post("generateCode", {
-      designId: designId,
-    });
+    const response = await axios.post("generateCode", { designId });
 
     const result = await response.data;
 
@@ -56,6 +55,21 @@ const Home = () => {
   const clearCanvas = () => {
     setShapes([]);
     setSelectedShape(null);
+    setGroupShapes([]);
+  };
+
+  const handleGroupComponents = () => {
+    const selectedShapes = shapes.filter((shape) => shape.selected);
+    if (selectedShapes.length > 0) {
+      const newGroup = {
+        id: `group${Math.random().toString(36).substr(2, 9)}`,
+        type: "group",
+        shapes: selectedShapes,
+      };
+      setGroupShapes([...groupShapes, newGroup]);
+      setShapes(shapes.filter((shape) => !shape.selected));
+      setSelectedShape(null);
+    }
   };
 
   return (
@@ -68,6 +82,7 @@ const Home = () => {
         onSaveDesign={saveDesign}
         onGenerateCode={generateCode}
         onClearCanvas={clearCanvas}
+        onGroupComponents={handleGroupComponents}
       />
       <Canvas
         shapes={shapes}
@@ -76,6 +91,8 @@ const Home = () => {
         setTool={setTool}
         selectedShape={selectedShape}
         setSelectedShape={setSelectedShape}
+        groupShapes={groupShapes}
+        setGroupShapes={setGroupShapes}
       />
       <ShapeEditor selectedShape={selectedShape} setShapes={setShapes} />
       <Modal

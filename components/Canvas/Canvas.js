@@ -1,15 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import {
-  Stage,
-  Layer,
-  Rect,
-  Circle,
-  Line,
-  Text,
-  Transformer,
-} from "react-konva";
+import React, { useRef, useEffect, useState } from "react";
 import styles from "./Canvas.module.scss";
 
 const Canvas = ({
@@ -19,67 +10,84 @@ const Canvas = ({
   setTool,
   selectedShape,
   setSelectedShape,
+  groupShapes,
+  setGroupShapes,
 }) => {
+  const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState(null);
+  const [selectionRect, setSelectionRect] = useState(null);
   const [canvasDimensions, setCanvasDimensions] = useState({
-    width: 0,
-    height: 0,
+    width: window.innerWidth,
+    height: window.innerHeight,
   });
-  const stageRef = useRef();
-  const layerRef = useRef();
-  const trRef = useRef();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setCanvasDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+    canvas.width = canvasDimensions.width;
+    canvas.height = canvasDimensions.height;
+
+    const drawShapes = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      shapes.forEach((shape) => {
+        context.beginPath();
+        if (shape.type === "rectangle") {
+          context.rect(shape.x, shape.y, shape.width, shape.height);
+          context.fillStyle = shape.fill;
+          context.fill();
+        } else if (shape.type === "circle") {
+          context.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
+          context.fillStyle = shape.fill;
+          context.fill();
+        } else if (shape.type === "line") {
+          context.moveTo(shape.points[0], shape.points[1]);
+          context.lineTo(shape.points[2], shape.points[3]);
+          context.strokeStyle = shape.stroke;
+          context.lineWidth = shape.strokeWidth;
+          context.stroke();
+        } else if (shape.type === "text") {
+          context.font = `${shape.fontSize}px Arial`;
+          context.fillStyle = shape.fill;
+          context.fillText(shape.text, shape.x, shape.y);
+        }
+        context.closePath();
       });
-      window.addEventListener("resize", updateCanvasDimensions);
-      return () => window.removeEventListener("resize", updateCanvasDimensions);
-    }
-  }, []);
 
-  const updateCanvasDimensions = () => {
-    setCanvasDimensions({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
-  };
-
-  useEffect(() => {
-    if (selectedShape) {
-      const node = layerRef.current.findOne(`#${selectedShape.id}`);
-      if (node) {
-        trRef.current.nodes([node]);
-        trRef.current.getLayer().batchDraw();
+      if (selectionRect) {
+        context.beginPath();
+        context.rect(
+          selectionRect.x,
+          selectionRect.y,
+          selectionRect.width,
+          selectionRect.height
+        );
+        context.fillStyle = "rgba(0, 0, 255, 0.3)";
+        context.fill();
+        context.closePath();
       }
-    } else {
-      trRef.current.nodes([]);
-      trRef.current.getLayer().batchDraw();
-    }
-  }, [selectedShape]);
+    };
+
+    drawShapes();
+  }, [shapes, selectionRect, canvasDimensions]);
 
   const handleMouseDown = (e) => {
-    if (tool) {
-      const stage = stageRef.current.getStage();
-      const point = stage.getPointerPosition();
-      setDrawing(true);
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
+    if (tool) {
+      setDrawing(true);
       const newShape = {
         id: `shape${shapes.length + 1}`,
         type: tool,
-        x: point.x,
-        y: point.y,
+        x: x,
+        y: y,
         ...(tool === "rectangle" ? { width: 0, height: 0, fill: "red" } : {}),
         ...(tool === "circle" ? { radius: 0, fill: "blue" } : {}),
         ...(tool === "line"
-          ? {
-              points: [point.x, point.y, point.x, point.y],
-              stroke: "black",
-              strokeWidth: 5,
-            }
+          ? { points: [x, y, x, y], stroke: "black", strokeWidth: 5 }
           : {}),
         ...(tool === "text"
           ? { text: "Sample Text", fontSize: 24, fill: "black" }
@@ -88,79 +96,62 @@ const Canvas = ({
       setCurrentShape(newShape);
       setShapes([...shapes, newShape]);
     } else {
-      const clickedOnEmpty = e.target === stageRef.current;
-      if (clickedOnEmpty) {
-        setSelectedShape(null);
-      } else {
-        const node = e.target;
-        const shape = shapes.find((shape) => shape.id === node.id());
-        setSelectedShape(shape);
-      }
+      setSelectionRect({ x: x, y: y, width: 0, height: 0 });
     }
   };
 
   const handleMouseMove = (e) => {
-    if (!drawing) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    const stage = stageRef.current.getStage();
-    const point = stage.getPointerPosition();
-    const shapesCopy = [...shapes];
-
-    if (tool === "rectangle") {
-      shapesCopy[shapesCopy.length - 1] = {
-        ...currentShape,
-        width: point.x - currentShape.x,
-        height: point.y - currentShape.y,
-      };
-    } else if (tool === "circle") {
-      shapesCopy[shapesCopy.length - 1] = {
-        ...currentShape,
-        radius: Math.sqrt(
-          Math.pow(point.x - currentShape.x, 2) +
-            Math.pow(point.y - currentShape.y, 2)
-        ),
-      };
-    } else if (tool === "line") {
-      shapesCopy[shapesCopy.length - 1] = {
-        ...currentShape,
-        points: [currentShape.x, currentShape.y, point.x, point.y],
-      };
+    if (drawing && tool) {
+      const updatedShape = { ...currentShape };
+      if (tool === "rectangle") {
+        updatedShape.width = x - currentShape.x;
+        updatedShape.height = y - currentShape.y;
+      } else if (tool === "circle") {
+        updatedShape.radius = Math.sqrt(
+          Math.pow(x - currentShape.x, 2) + Math.pow(y - currentShape.y, 2)
+        );
+      } else if (tool === "line") {
+        updatedShape.points = [
+          currentShape.points[0],
+          currentShape.points[1],
+          x,
+          y,
+        ];
+      }
+      setCurrentShape(updatedShape);
+      setShapes([...shapes.slice(0, -1), updatedShape]);
+    } else if (selectionRect) {
+      setSelectionRect({
+        ...selectionRect,
+        width: x - selectionRect.x,
+        height: y - selectionRect.y,
+      });
     }
-    setShapes(shapesCopy);
   };
 
   const handleMouseUp = () => {
     setDrawing(false);
     setTool(null);
-  };
-
-  const handleDragEnd = (e, id) => {
-    const shapesCopy = shapes.map((shape) => {
-      if (shape.id === id) {
-        return { ...shape, x: e.target.x(), y: e.target.y() };
-      }
-      return shape;
-    });
-    setShapes(shapesCopy);
-  };
-
-  const handleTransformEnd = (e, id) => {
-    const node = e.target;
-    const shapesCopy = shapes.map((shape) => {
-      if (shape.id === id) {
-        return {
-          ...shape,
-          x: node.x(),
-          y: node.y(),
-          width: node.width() * node.scaleX(),
-          height: node.height() * node.scaleY(),
-          scaleX: 1,
-          scaleY: 1,
-        };
-      }
-      return shape;
-    });
-    setShapes(shapesCopy);
+    if (selectionRect) {
+      const updatedShapes = shapes.map((shape) => {
+        if (
+          shape.x > selectionRect.x &&
+          shape.y > selectionRect.y &&
+          shape.x < selectionRect.x + selectionRect.width &&
+          shape.y < selectionRect.y + selectionRect.height
+        ) {
+          return { ...shape, selected: true };
+        }
+        return shape;
+      });
+      setShapes(updatedShapes);
+      setSelectionRect(null);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -177,72 +168,27 @@ const Canvas = ({
     };
   }, [selectedShape]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setCanvasDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className={styles.canvasContainer}>
-      <Stage
+      <canvas
+        ref={canvasRef}
         width={canvasDimensions.width}
         height={canvasDimensions.height}
-        ref={stageRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-      >
-        <Layer ref={layerRef}>
-          {shapes.map((shape, i) => {
-            if (shape.type === "rectangle") {
-              return (
-                <Rect
-                  key={shape.id}
-                  id={shape.id}
-                  {...shape}
-                  draggable
-                  onDragEnd={(e) => handleDragEnd(e, shape.id)}
-                  onTransformEnd={(e) => handleTransformEnd(e, shape.id)}
-                  onClick={() => setSelectedShape(shape)}
-                />
-              );
-            } else if (shape.type === "circle") {
-              return (
-                <Circle
-                  key={shape.id}
-                  id={shape.id}
-                  {...shape}
-                  draggable
-                  onDragEnd={(e) => handleDragEnd(e, shape.id)}
-                  onTransformEnd={(e) => handleTransformEnd(e, shape.id)}
-                  onClick={() => setSelectedShape(shape)}
-                />
-              );
-            } else if (shape.type === "line") {
-              return (
-                <Line
-                  key={shape.id}
-                  id={shape.id}
-                  {...shape}
-                  draggable
-                  onDragEnd={(e) => handleDragEnd(e, shape.id)}
-                  onTransformEnd={(e) => handleTransformEnd(e, shape.id)}
-                  onClick={() => setSelectedShape(shape)}
-                />
-              );
-            } else if (shape.type === "text") {
-              return (
-                <Text
-                  key={shape.id}
-                  id={shape.id}
-                  {...shape}
-                  draggable
-                  onDragEnd={(e) => handleDragEnd(e, shape.id)}
-                  onTransformEnd={(e) => handleTransformEnd(e, shape.id)}
-                  onClick={() => setSelectedShape(shape)}
-                />
-              );
-            }
-            return null;
-          })}
-          <Transformer ref={trRef} />
-        </Layer>
-      </Stage>
+      />
     </div>
   );
 };

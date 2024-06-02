@@ -2,13 +2,15 @@ import mongoose, { Schema } from "mongoose";
 
 const componentSchema = new Schema({
   id: { type: String, required: true },
-  name: { type: String, required: true },
   type: { type: String, required: true },
   x: { type: Number, required: true },
   y: { type: Number, required: true },
   width: { type: Number, required: true },
   height: { type: Number, required: true },
   fill: { type: String, required: true },
+  radius: { type: Number }, // only for circles
+  points: { type: [Number] }, // only for lines
+  text: { type: String }, // only for text
   content: { type: String, default: "" },
 });
 

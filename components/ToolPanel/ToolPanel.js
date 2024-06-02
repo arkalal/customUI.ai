@@ -11,6 +11,7 @@ const ToolPanel = ({
   onSaveDesign,
   onGenerateCode,
   onClearCanvas,
+  onGroupComponents,
 }) => {
   return (
     <div className={styles.toolPanel}>
@@ -18,6 +19,7 @@ const ToolPanel = ({
       <button onClick={onAddCircle}>Add Circle</button>
       <button onClick={onAddLine}>Add Line</button>
       <button onClick={onAddText}>Add Text</button>
+      <button onClick={onGroupComponents}>Group Components</button>
       <button onClick={onSaveDesign}>Save Design</button>
       <button onClick={onGenerateCode}>Generate Code</button>
       <button onClick={onClearCanvas}>Clear Canvas</button>

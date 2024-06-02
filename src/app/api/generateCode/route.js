@@ -12,8 +12,6 @@ export async function POST(req) {
       return NextResponse.json({ error: "Design not found." }, { status: 404 });
     }
 
-    console.log("Design:", design);
-
     const jsxCode = generateJSX(design);
     const scssCode = generateSCSS(design);
 
@@ -26,16 +24,44 @@ export async function POST(req) {
 function generateJSX(design) {
   const componentsCode = design.components
     .map((component) => {
-      if (!component.id) {
-        throw new Error("Component ID is undefined");
-      }
+      if (component.type === "group") {
+        const groupComponents = component.shapes
+          .map((shape) => {
+            const componentName =
+              shape.id.charAt(0).toUpperCase() + shape.id.slice(1);
+            const stylesName =
+              shape.id.charAt(0).toLowerCase() + shape.id.slice(1);
 
-      const componentName =
-        component.id.charAt(0).toUpperCase() + component.id.slice(1);
-      const stylesName =
-        component.id.charAt(0).toLowerCase() + component.id.slice(1);
+            return `
+const ${componentName} = () => (
+  <div className={styles.${stylesName}} style={{
+    width: '${shape.width || 0}px',
+    height: '${shape.height || 0}px',
+    backgroundColor: '${shape.fill || "transparent"}'
+  }}>
+    ${shape.content || ""}
+  </div>
+);
+export default ${componentName};
+            `;
+          })
+          .join("\n");
 
-      return `
+        return `
+const ${component.id} = () => (
+  <div>
+    ${groupComponents}
+  </div>
+);
+export default ${component.id};
+        `;
+      } else {
+        const componentName =
+          component.id.charAt(0).toUpperCase() + component.id.slice(1);
+        const stylesName =
+          component.id.charAt(0).toLowerCase() + component.id.slice(1);
+
+        return `
 const ${componentName} = () => (
   <div className={styles.${stylesName}} style={{
     width: '${component.width || 0}px',
@@ -45,9 +71,9 @@ const ${componentName} = () => (
     ${component.content || ""}
   </div>
 );
-
 export default ${componentName};
-    `;
+        `;
+      }
     })
     .join("\n");
 
@@ -62,20 +88,39 @@ ${componentsCode}
 function generateSCSS(design) {
   const stylesCode = design.components
     .map((component) => {
-      if (!component.id) {
-        throw new Error("Component ID is undefined");
-      }
+      if (component.type === "group") {
+        const groupStyles = component.shapes
+          .map((shape) => {
+            const stylesName =
+              shape.id.charAt(0).toLowerCase() + shape.id.slice(1);
 
-      const stylesName =
-        component.id.charAt(0).toLowerCase() + component.id.slice(1);
+            return `
+.${stylesName} {
+  width: ${shape.width || 0}px;
+  height: ${shape.height || 0}px;
+  background-color: ${shape.fill || "transparent"};
+}
+            `;
+          })
+          .join("\n");
 
-      return `
+        return `
+.${component.id} {
+  ${groupStyles}
+}
+        `;
+      } else {
+        const stylesName =
+          component.id.charAt(0).toLowerCase() + component.id.slice(1);
+
+        return `
 .${stylesName} {
   width: ${component.width || 0}px;
   height: ${component.height || 0}px;
   background-color: ${component.fill || "transparent"};
 }
-    `;
+        `;
+      }
     })
     .join("\n");
 

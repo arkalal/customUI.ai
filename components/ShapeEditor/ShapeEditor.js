@@ -17,42 +17,53 @@ const ShapeEditor = ({ selectedShape, setShapes }) => {
 
   return (
     <div className={styles.shapeEditor}>
-      <label>
-        Color:
-        <input
-          type="color"
-          name="fill"
-          value={selectedShape.fill || "#000000"}
-          onChange={handleChange}
-        />
-      </label>
-      <label>
-        Border Color:
-        <input
-          type="color"
-          name="stroke"
-          value={selectedShape.stroke || "#000000"}
-          onChange={handleChange}
-        />
-      </label>
-      <label>
-        Border Width:
-        <input
-          type="number"
-          name="strokeWidth"
-          value={selectedShape.strokeWidth || 0}
-          onChange={handleChange}
-        />
-      </label>
-      <label>
-        Z-Index:
-        <input
-          type="number"
-          name="zIndex"
-          value={selectedShape.zIndex || 0}
-          onChange={handleChange}
-        />
-      </label>
+      <h3>Edit Shape</h3>
+      {selectedShape.type === "text" && (
+        <>
+          <label>
+            Text:
+            <input
+              type="text"
+              name="text"
+              value={selectedShape.text}
+              onChange={handleChange}
+            />
+          </label>
+          <label>
+            Font Size:
+            <input
+              type="number"
+              name="fontSize"
+              value={selectedShape.fontSize}
+              onChange={handleChange}
+            />
+          </label>
+        </>
+      )}
+      {selectedShape.type !== "text" && (
+        <>
+          <label>
+            Fill Color:
+            <input
+              type="color"
+              name="fill"
+              value={selectedShape.fill}
+              onChange={handleChange}
+            />
+          </label>
+          {selectedShape.type === "line" && (
+            <label>
+              Stroke Color:
+              <input
+                type="color"
+                name="stroke"
+                value={selectedShape.stroke}
+                onChange={handleChange}
+              />
+            </label>
+          )}
+        </>
+      )}
     </div>
   );
 };
