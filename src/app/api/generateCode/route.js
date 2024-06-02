@@ -30,20 +30,14 @@ const ${design.name} = () => (
   <div className={styles.container}>
     ${design.components
       .map((component) => {
+        const componentTag = component.type === "text" ? "span" : "div";
         const stylesName =
           component.id.charAt(0).toLowerCase() + component.id.slice(1);
 
         return `
-        <div className={styles.${stylesName}} style={{
-          position: 'absolute',
-          left: '${component.x}px',
-          top: '${component.y}px',
-          width: '${component.width || 0}px',
-          height: '${component.height || 0}px',
-          backgroundColor: '${component.fill || "transparent"}'
-        }}>
+        <${componentTag} className={styles.${stylesName}}>
           ${component.text || ""}
-        </div>`;
+        </${componentTag}>`;
       })
       .join("\n")}
   </div>
@@ -65,15 +59,38 @@ ${design.components
   .map((component) => {
     const stylesName =
       component.id.charAt(0).toLowerCase() + component.id.slice(1);
+    let shapeSpecificStyles = "";
+
+    if (component.type === "circle") {
+      shapeSpecificStyles = `
+        width: ${component.radius * 2}px;
+        height: ${component.radius * 2}px;
+        border-radius: 50%;
+      `;
+    } else if (component.type === "rectangle" || component.type === "text") {
+      shapeSpecificStyles = `
+        width: ${component.width}px;
+        height: ${component.height}px;
+      `;
+    } else if (component.type === "line") {
+      // For line, we might need to use different approach in real projects, such as SVG or canvas.
+      shapeSpecificStyles = `
+        width: ${Math.abs(component.points[2] - component.points[0])}px;
+        height: ${component.strokeWidth}px;
+        transform: rotate(${Math.atan2(
+          component.points[3] - component.points[1],
+          component.points[2] - component.points[0]
+        )}rad);
+      `;
+    }
 
     return `
 .${stylesName} {
   position: absolute;
   left: ${component.x}px;
   top: ${component.y}px;
-  width: ${component.width || 0}px;
-  height: ${component.height || 0}px;
   background-color: ${component.fill || "transparent"};
+  ${shapeSpecificStyles}
 }
     `;
   })
