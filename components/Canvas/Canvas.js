@@ -43,7 +43,70 @@ const Canvas = ({
   }, []);
 
   const drawSelectionOutline = (context, shape) => {
-    // Function implementation...
+    context.lineWidth = 2;
+    context.strokeStyle = "blue";
+    context.setLineDash([5, 5]);
+
+    if (shape.type === "rectangle") {
+      context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+    } else if (shape.type === "circle") {
+      context.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    context.setLineDash([]);
+    context.fillStyle = "white";
+    context.strokeStyle = "black";
+    context.lineWidth = 1;
+
+    const handleSize = 8;
+    const halfHandleSize = handleSize / 2;
+    let handles = [];
+
+    if (shape.type === "rectangle") {
+      handles = [
+        { x: shape.x - halfHandleSize, y: shape.y - halfHandleSize },
+        {
+          x: shape.x + shape.width - halfHandleSize,
+          y: shape.y - halfHandleSize,
+        },
+        {
+          x: shape.x - halfHandleSize,
+          y: shape.y + shape.height - halfHandleSize,
+        },
+        {
+          x: shape.x + shape.width - halfHandleSize,
+          y: shape.y + shape.height - halfHandleSize,
+        },
+      ];
+    } else if (shape.type === "circle") {
+      handles = [
+        {
+          x: shape.x + shape.radius - halfHandleSize,
+          y: shape.y - halfHandleSize,
+        },
+        {
+          x: shape.x - shape.radius - halfHandleSize,
+          y: shape.y - halfHandleSize,
+        },
+        {
+          x: shape.x - halfHandleSize,
+          y: shape.y + shape.radius - halfHandleSize,
+        },
+        {
+          x: shape.x - halfHandleSize,
+          y: shape.y - shape.radius - halfHandleSize,
+        },
+      ];
+    }
+
+    handles.forEach((handle, index) => {
+      context.fillRect(handle.x, handle.y, handleSize, handleSize);
+      context.strokeRect(handle.x, handle.y, handleSize, handleSize);
+      handle.index = index;
+    });
+
+    return handles;
   };
 
   useEffect(() => {
