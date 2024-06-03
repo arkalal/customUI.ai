@@ -24,6 +24,7 @@ const Canvas = ({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandleIndex, setResizeHandleIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [resizeHandles, setResizeHandles] = useState([]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -61,7 +62,7 @@ const Canvas = ({
     context.strokeStyle = "black";
     context.lineWidth = 1;
 
-    const handleSize = 8;
+    const handleSize = 12; // Increase handle size
     const halfHandleSize = handleSize / 2;
     let handles = [];
 
@@ -108,7 +109,7 @@ const Canvas = ({
       handle.index = index;
     });
 
-    return handles;
+    setResizeHandles(handles);
   };
 
   useEffect(() => {
@@ -199,6 +200,21 @@ const Canvas = ({
     return null;
   };
 
+  const getResizeHandleAtCoordinates = (x, y) => {
+    for (let i = 0; i < resizeHandles.length; i++) {
+      const handle = resizeHandles[i];
+      if (
+        x >= handle.x &&
+        x <= handle.x + 12 &&
+        y >= handle.y &&
+        y <= handle.y + 12
+      ) {
+        return handle.index;
+      }
+    }
+    return null;
+  };
+
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -232,23 +248,29 @@ const Canvas = ({
       setDragStart({ x, y });
       setIsDragging(true);
     } else {
-      const clickedShape = getShapeAtCoordinates(x, y);
-      if (clickedShape) {
-        setSelectedShape(clickedShape);
-        setShapes((prevShapes) =>
-          prevShapes.map((shape) =>
-            shape.id === clickedShape.id
-              ? { ...shape, selected: true }
-              : { ...shape, selected: false }
-          )
-        );
-        setDragStart({ x, y });
-        setIsDragging(true);
+      const handleIndex = getResizeHandleAtCoordinates(x, y);
+      if (handleIndex !== null) {
+        setIsResizing(true);
+        setResizeHandleIndex(handleIndex);
       } else {
-        setSelectedShape(null);
-        setShapes((prevShapes) =>
-          prevShapes.map((shape) => ({ ...shape, selected: false }))
-        );
+        const clickedShape = getShapeAtCoordinates(x, y);
+        if (clickedShape) {
+          setSelectedShape(clickedShape);
+          setShapes((prevShapes) =>
+            prevShapes.map((shape) =>
+              shape.id === clickedShape.id
+                ? { ...shape, selected: true }
+                : { ...shape, selected: false }
+            )
+          );
+          setDragStart({ x, y });
+          setIsDragging(true);
+        } else {
+          setSelectedShape(null);
+          setShapes((prevShapes) =>
+            prevShapes.map((shape) => ({ ...shape, selected: false }))
+          );
+        }
       }
     }
   };
