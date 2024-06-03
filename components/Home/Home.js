@@ -18,6 +18,7 @@ const Home = () => {
   const [selectedShape, setSelectedShape] = useState(null);
   const [designId, setDesignId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
 
   const addShape = (type) => {
     setTool(type);
@@ -56,6 +57,10 @@ const Home = () => {
     setSelectedShape(null);
   };
 
+  const dragCanvas = () => {
+    setIsDraggingCanvas(!isDraggingCanvas);
+  };
+
   return (
     <div className={styles.appContainer}>
       <ToolPanel
@@ -66,6 +71,7 @@ const Home = () => {
         onSaveDesign={saveDesign}
         onGenerateCode={generateCode}
         onClearCanvas={clearCanvas}
+        onDragCanvas={dragCanvas}
       />
       <Canvas
         shapes={shapes}
@@ -74,6 +80,8 @@ const Home = () => {
         setTool={setTool}
         selectedShape={selectedShape}
         setSelectedShape={setSelectedShape}
+        isDraggingCanvas={isDraggingCanvas}
+        setIsDraggingCanvas={setIsDraggingCanvas}
       />
       <ShapeEditor selectedShape={selectedShape} setShapes={setShapes} />
       <Modal

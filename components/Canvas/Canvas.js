@@ -10,6 +10,8 @@ const Canvas = ({
   setTool,
   selectedShape,
   setSelectedShape,
+  isDraggingCanvas,
+  setIsDraggingCanvas,
 }) => {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
@@ -18,10 +20,12 @@ const Canvas = ({
     width: 0,
     height: 0,
   });
-  const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandleIndex, setResizeHandleIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [marqueeStart, setMarqueeStart] = useState(null);
+  const [marqueeEnd, setMarqueeEnd] = useState(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -149,10 +153,23 @@ const Canvas = ({
         }
         context.closePath();
       });
+
+      // Draw marquee selection
+      if (marqueeStart && marqueeEnd) {
+        context.setLineDash([5, 5]);
+        context.strokeStyle = "rgba(0,0,255,0.5)";
+        context.strokeRect(
+          marqueeStart.x,
+          marqueeStart.y,
+          marqueeEnd.x - marqueeStart.x,
+          marqueeEnd.y - marqueeStart.y
+        );
+        context.setLineDash([]);
+      }
     };
 
     drawShapes();
-  }, [shapes, canvasDimensions]);
+  }, [shapes, canvasDimensions, marqueeStart, marqueeEnd]);
 
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
@@ -183,8 +200,34 @@ const Canvas = ({
         newShape,
       ]);
       setSelectedShape(newShape);
+    } else if (isDraggingCanvas) {
+      setDragStart({ x, y });
+      setIsDragging(true);
     } else {
       let handleClicked = false;
+      let shapeClicked = false;
+
+      shapes.forEach((shape) => {
+        if (
+          x >= shape.x &&
+          x <= shape.x + (shape.width || shape.radius * 2) &&
+          y >= shape.y &&
+          y <= shape.y + (shape.height || shape.radius * 2)
+        ) {
+          setSelectedShape(shape);
+          setShapes((prevShapes) =>
+            prevShapes.map((s) =>
+              s.id === shape.id
+                ? { ...s, selected: true }
+                : { ...s, selected: false }
+            )
+          );
+          shapeClicked = true;
+          setDragStart({ x, y });
+          setIsDragging(true);
+        }
+      });
+
       if (selectedShape) {
         const handles = drawSelectionOutline(
           canvas.getContext("2d"),
@@ -203,29 +246,14 @@ const Canvas = ({
           }
         });
       }
-      if (!handleClicked) {
-        const clickedShape = shapes.find(
-          (shape) =>
-            x >= shape.x &&
-            x <= shape.x + (shape.width || shape.radius * 2) &&
-            y >= shape.y &&
-            y <= shape.y + (shape.height || shape.radius * 2)
+
+      if (!handleClicked && !shapeClicked) {
+        setMarqueeStart({ x, y });
+        setMarqueeEnd(null);
+        setSelectedShape(null);
+        setShapes((prevShapes) =>
+          prevShapes.map((s) => ({ ...s, selected: false }))
         );
-        if (clickedShape) {
-          setSelectedShape(clickedShape);
-          setShapes(
-            shapes.map((shape) =>
-              shape.id === clickedShape.id
-                ? { ...shape, selected: true }
-                : { ...shape, selected: false }
-            )
-          );
-          setIsDragging(true);
-          setDragStart({ x, y });
-        } else {
-          setSelectedShape(null);
-          setShapes(shapes.map((shape) => ({ ...shape, selected: false })));
-        }
       }
     }
   };
@@ -255,12 +283,23 @@ const Canvas = ({
       }
       setCurrentShape(updatedShape);
       setShapes([...shapes.slice(0, -1), updatedShape]);
+    } else if (isDragging && isDraggingCanvas) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      setShapes(
+        shapes.map((shape) => ({
+          ...shape,
+          x: shape.x + dx,
+          y: shape.y + dy,
+        }))
+      );
+      setDragStart({ x, y });
     } else if (isDragging && selectedShape) {
       const dx = x - dragStart.x;
       const dy = y - dragStart.y;
       setShapes(
         shapes.map((shape) =>
-          shape.id === selectedShape.id
+          shape.selected
             ? {
                 ...shape,
                 x: shape.x + dx,
@@ -308,14 +347,57 @@ const Canvas = ({
           shape.id === selectedShape.id ? updatedShape : shape
         )
       );
+    } else if (marqueeStart) {
+      setMarqueeEnd({ x, y });
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
     setDrawing(false);
     setTool(null);
     setIsDragging(false);
     setIsResizing(false);
+    setIsDraggingCanvas(false);
+
+    if (marqueeStart && marqueeEnd) {
+      const selectedShapes = shapes.map((shape) => {
+        const shapeRight = shape.x + (shape.width || shape.radius * 2);
+        const shapeBottom = shape.y + (shape.height || shape.radius * 2);
+
+        if (
+          shape.x >= marqueeStart.x &&
+          shape.y >= marqueeStart.y &&
+          shapeRight <= marqueeEnd.x &&
+          shapeBottom <= marqueeEnd.y
+        ) {
+          return { ...shape, selected: true };
+        }
+        return shape;
+      });
+
+      setShapes(selectedShapes);
+    }
+
+    // Unselect elements if clicked outside
+    const clickedOutside = !shapes.some(
+      (shape) =>
+        x >= shape.x &&
+        x <= shape.x + (shape.width || shape.radius * 2) &&
+        y >= shape.y &&
+        y <= shape.y + (shape.height || shape.radius * 2) &&
+        shape.selected
+    );
+    if (clickedOutside) {
+      setShapes(shapes.map((shape) => ({ ...shape, selected: false })));
+    }
+
+    setMarqueeStart(null);
+    setMarqueeEnd(null);
   };
 
   const handleKeyDown = (e) => {

@@ -1,5 +1,6 @@
 .appContainer {
   display: flex;
+  flex-direction: column;
 
   .codeContainer {
     width: 100%;
