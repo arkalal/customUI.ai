@@ -24,8 +24,6 @@ const Canvas = ({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandleIndex, setResizeHandleIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [marqueeStart, setMarqueeStart] = useState(null);
-  const [marqueeEnd, setMarqueeEnd] = useState(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -153,23 +151,53 @@ const Canvas = ({
         }
         context.closePath();
       });
-
-      // Draw marquee selection
-      if (marqueeStart && marqueeEnd) {
-        context.setLineDash([5, 5]);
-        context.strokeStyle = "rgba(0,0,255,0.5)";
-        context.strokeRect(
-          marqueeStart.x,
-          marqueeStart.y,
-          marqueeEnd.x - marqueeStart.x,
-          marqueeEnd.y - marqueeStart.y
-        );
-        context.setLineDash([]);
-      }
     };
 
     drawShapes();
-  }, [shapes, canvasDimensions, marqueeStart, marqueeEnd]);
+  }, [shapes, canvasDimensions]);
+
+  const getShapeAtCoordinates = (x, y) => {
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      const shape = shapes[i];
+      if (shape.type === "rectangle") {
+        if (
+          x >= shape.x &&
+          x <= shape.x + shape.width &&
+          y >= shape.y &&
+          y <= shape.y + shape.height
+        ) {
+          return shape;
+        }
+      } else if (shape.type === "circle") {
+        const dx = x - shape.x;
+        const dy = y - shape.y;
+        if (Math.sqrt(dx * dx + dy * dy) <= shape.radius) {
+          return shape;
+        }
+      } else if (shape.type === "line") {
+        // Approximate hit detection for line
+        const [x1, y1, x2, y2] = shape.points;
+        const distance =
+          Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) /
+          Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2);
+        if (distance <= shape.strokeWidth) {
+          return shape;
+        }
+      } else if (shape.type === "text") {
+        const textWidth = context.measureText(shape.text).width;
+        const textHeight = shape.fontSize; // Approximate height
+        if (
+          x >= shape.x &&
+          x <= shape.x + textWidth &&
+          y >= shape.y - textHeight &&
+          y <= shape.y
+        ) {
+          return shape;
+        }
+      }
+    }
+    return null;
+  };
 
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
@@ -204,55 +232,22 @@ const Canvas = ({
       setDragStart({ x, y });
       setIsDragging(true);
     } else {
-      let handleClicked = false;
-      let shapeClicked = false;
-
-      shapes.forEach((shape) => {
-        if (
-          x >= shape.x &&
-          x <= shape.x + (shape.width || shape.radius * 2) &&
-          y >= shape.y &&
-          y <= shape.y + (shape.height || shape.radius * 2)
-        ) {
-          setSelectedShape(shape);
-          setShapes((prevShapes) =>
-            prevShapes.map((s) =>
-              s.id === shape.id
-                ? { ...s, selected: true }
-                : { ...s, selected: false }
-            )
-          );
-          shapeClicked = true;
-          setDragStart({ x, y });
-          setIsDragging(true);
-        }
-      });
-
-      if (selectedShape) {
-        const handles = drawSelectionOutline(
-          canvas.getContext("2d"),
-          selectedShape
+      const clickedShape = getShapeAtCoordinates(x, y);
+      if (clickedShape) {
+        setSelectedShape(clickedShape);
+        setShapes((prevShapes) =>
+          prevShapes.map((shape) =>
+            shape.id === clickedShape.id
+              ? { ...shape, selected: true }
+              : { ...shape, selected: false }
+          )
         );
-        handles.forEach((handle, index) => {
-          if (
-            x >= handle.x &&
-            x <= handle.x + 8 &&
-            y >= handle.y &&
-            y <= handle.y + 8
-          ) {
-            setIsResizing(true);
-            setResizeHandleIndex(index);
-            handleClicked = true;
-          }
-        });
-      }
-
-      if (!handleClicked && !shapeClicked) {
-        setMarqueeStart({ x, y });
-        setMarqueeEnd(null);
+        setDragStart({ x, y });
+        setIsDragging(true);
+      } else {
         setSelectedShape(null);
         setShapes((prevShapes) =>
-          prevShapes.map((s) => ({ ...s, selected: false }))
+          prevShapes.map((shape) => ({ ...shape, selected: false }))
         );
       }
     }
@@ -347,57 +342,15 @@ const Canvas = ({
           shape.id === selectedShape.id ? updatedShape : shape
         )
       );
-    } else if (marqueeStart) {
-      setMarqueeEnd({ x, y });
     }
   };
 
   const handleMouseUp = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
     setDrawing(false);
     setTool(null);
     setIsDragging(false);
     setIsResizing(false);
     setIsDraggingCanvas(false);
-
-    if (marqueeStart && marqueeEnd) {
-      const selectedShapes = shapes.map((shape) => {
-        const shapeRight = shape.x + (shape.width || shape.radius * 2);
-        const shapeBottom = shape.y + (shape.height || shape.radius * 2);
-
-        if (
-          shape.x >= marqueeStart.x &&
-          shape.y >= marqueeStart.y &&
-          shapeRight <= marqueeEnd.x &&
-          shapeBottom <= marqueeEnd.y
-        ) {
-          return { ...shape, selected: true };
-        }
-        return shape;
-      });
-
-      setShapes(selectedShapes);
-    }
-
-    // Unselect elements if clicked outside
-    const clickedOutside = !shapes.some(
-      (shape) =>
-        x >= shape.x &&
-        x <= shape.x + (shape.width || shape.radius * 2) &&
-        y >= shape.y &&
-        y <= shape.y + (shape.height || shape.radius * 2) &&
-        shape.selected
-    );
-    if (clickedOutside) {
-      setShapes(shapes.map((shape) => ({ ...shape, selected: false })));
-    }
-
-    setMarqueeStart(null);
-    setMarqueeEnd(null);
   };
 
   const handleKeyDown = (e) => {
